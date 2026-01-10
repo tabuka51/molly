@@ -1,36 +1,47 @@
 @echo off
-title RDP HARD FIX
 color 0C
+title ULTIMATE RDP FIX - NO BS
 
-echo === RDP REGISTRY ENABLE ===
+echo ===== KILL GPO CACHE =====
+rd /s /q "%windir%\System32\GroupPolicy"
+rd /s /q "%windir%\System32\GroupPolicyUsers"
+gpupdate /force
+
+echo ===== ENABLE RDP REGISTRY =====
 reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f
-
 reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v AllowTSConnections /t REG_DWORD /d 1 /f
 
-echo === NLA ENABLE ===
-reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 1 /f
-
-echo === RDP PORT RESET (3389) ===
+echo ===== FORCE RDP TCP SETTINGS =====
 reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v PortNumber /t REG_DWORD /d 3389 /f
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v SecurityLayer /t REG_DWORD /d 0 /f
 
-echo === SERVICES FIX ===
+echo ===== FORCE SERVICES =====
 sc config TermService start= auto
 sc config UmRdpService start= auto
+sc config SessionEnv start= auto
 
 net stop TermService /y
 net start TermService
 
-echo === FIREWALL RESET + RDP RULES ===
+echo ===== FULL FIREWALL NUKE + REBUILD =====
 netsh advfirewall reset
-netsh advfirewall firewall set rule group="remote desktop" new enable=Yes
+netsh advfirewall set allprofiles state off
 
 netsh advfirewall firewall add rule name="RDP TCP 3389" dir=in action=allow protocol=TCP localport=3389
 netsh advfirewall firewall add rule name="RDP UDP 3389" dir=in action=allow protocol=UDP localport=3389
 
-echo === USER PERMISSION FIX ===
-net localgroup "Remote Desktop Users" /add %USERNAME%
+netsh advfirewall set allprofiles state on
 
-echo === DONE ===
-echo RESTART REQUIRED !!!
-pause
-shutdown /r /t 5
+echo ===== USER PERMISSION =====
+net localgroup "Remote Desktop Users" /add %USERNAME%
+net localgroup Administrators %USERNAME% /add
+
+echo ===== NETWORK RESET =====
+netsh int ip reset
+ipconfig /flushdns
+
+echo ===== DONE =====
+echo 10 mp mulva ujrainditas...
+timeout /t 10
+shutdown /r /f /t 0
